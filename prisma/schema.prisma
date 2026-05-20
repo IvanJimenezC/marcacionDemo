@@ -1,0 +1,128 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. ENUM para Máquina de Estados de Campañas
+enum CampaignStatusEnum {
+  draft
+  scheduled
+  running
+  paused
+  stopped
+  completed
+
+  @@map("campaign_status_enum")
+}
+
+// 2. Entidades de Enrutamiento
+model Skills {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String      @db.VarChar(100)
+  description String?     @db.Text
+  created_at  DateTime    @default(now()) @db.Timestamp
+
+  campaigns   Campaigns[]
+
+  @@map("skills")
+}
+
+model Overflows {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String           @db.VarChar(100)
+  route_behavior String?          @db.VarChar(50)
+  did            String?          @db.VarChar(20)
+  created_at     DateTime         @default(now()) @db.Timestamp
+
+  campaigns      Campaigns[]
+  call_logs      CallLogs[]
+
+  @@map("overflows")
+}
+
+// 3. Tabla Principal de Campañas
+model Campaigns {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String             @db.VarChar(255)
+  skill_id           String?            @db.Uuid
+  overflow_id        String?            @db.Uuid
+  status             CampaignStatusEnum @default(draft)
+  campaign_timezone  String             @default("America/Mexico_City") @db.VarChar(50)
+  start_date         DateTime           @db.Date
+  end_date           DateTime?          @db.Date
+  start_time         DateTime           @db.Time
+  end_time           DateTime           @db.Time
+  max_attempts       Int                @default(3)
+  wait_time_seconds  Int                @default(3600)
+  created_at         DateTime           @default(now()) @db.Timestamp
+  updated_at         DateTime           @default(now()) @updatedAt @db.Timestamp
+  deleted_at         DateTime?          @db.Timestamp
+
+  // Relaciones
+  skill              Skills?            @relation(fields: [skill_id], references: [id], onDelete: Restrict)
+  overflow           Overflows?         @relation(fields: [overflow_id], references: [id], onDelete: Restrict)
+  leads              CampaignLeads[]
+
+  @@index([status, deleted_at], name: "idx_campaigns_active")
+  @@map("campaigns")
+}
+
+// 4. Estructura de Leads y Marcación
+model LeadProfiles {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  full_name       String          @db.VarChar(150)
+  additional_data Json            @default("{}") @db.JsonB
+
+  campaign_leads  CampaignLeads[]
+
+  @@map("lead_profiles")
+}
+
+model CampaignLeads {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaign_id      String        @db.Uuid
+  lead_profile_id  String        @db.Uuid
+  phone_number     String        @db.VarChar(15)
+  call_status      String        @default("pending") @db.VarChar(50)
+  current_attempts Int           @default(0)
+  next_retry_at    DateTime?     @db.Timestamp
+
+  // Relaciones
+  campaign         Campaigns     @relation(fields: [campaign_id], references: [id], onDelete: Restrict)
+  lead_profile     LeadProfiles  @relation(fields: [lead_profile_id], references: [id], onDelete: Restrict)
+  call_logs        CallLogs[]
+
+  @@unique([campaign_id, phone_number], name: "campaign_id_phone_number")
+  @@index([campaign_id, call_status, next_retry_at], name: "idx_leads_marcador")
+  @@map("campaign_leads")
+}
+
+model CallLogs {
+  id                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lead_id           String         @db.Uuid
+  overflow_id       String?        @db.Uuid
+  disposition       String?        @db.VarChar(50)
+  duration_seconds  Int            @default(0)
+  talk_time_seconds Int            @default(0)
+  ivr_path          String?        @db.VarChar(255)
+  recording_url     String?        @db.Text
+  created_at        DateTime       @default(now()) @db.Timestamp
+  is_test           Boolean        @default(false)
+
+  // Relaciones
+  lead              CampaignLeads  @relation(fields: [lead_id], references: [id], onDelete: Restrict)
+  overflow          Overflows?     @relation(fields: [overflow_id], references: [id], onDelete: Restrict)
+
+  @@index([lead_id, created_at(sort: Desc)], name: "idx_logs_lead_search")
+  @@map("call_logs")
+}
