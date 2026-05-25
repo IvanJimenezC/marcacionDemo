@@ -20,7 +20,7 @@ export class ImportService {
   }
 
   async processCsv(fileBuffer: Buffer, dto: UploadCsvDto) {
-    // Validar campaña
+    // TODO Validar campaña
     const campaign = await this.prisma.campaigns.findFirst({
       where: { id: dto.campaignId, deleted_at: null },
     });
@@ -29,7 +29,7 @@ export class ImportService {
       throw new BadRequestException('La campaña especificada no existe o fue eliminada.');
     }
 
-    // Parsear CSV original
+    // TODO Parsear CSV original
     let records: any[];
     try {
       records = parse(fileBuffer, {
@@ -49,7 +49,7 @@ export class ImportService {
     let duplicados = 0;
     let omitidos = 0;
 
-    // Aquí acumularemos los registros rechazados con su respectivo error
+    // TODO Aquí acumularemos los registros rechazados con su respectivo error HDP
     const registrosRechazados: any[] = [];
 
     // Trans e Inserción
@@ -58,7 +58,7 @@ export class ImportService {
         const rawPhone = row[dto.colTelefono];
         const rawName = row[dto.colNombre];
 
-        // Val 1: Campos obligatorios vacíos
+        // Validar Campos obligatorios vacíos
         if (!rawPhone || !rawName) {
           omitidos++;
           registrosRechazados.push({
@@ -70,7 +70,7 @@ export class ImportService {
 
         const cleanPhone = this.cleanPhoneNumber(rawPhone);
 
-        // Val 2: Longitud errónea (como el de 9 dígitos que detectaste)
+        //TODO validar Longitud errónea (numeros que no sean de 10 digitos >.<)
         if (cleanPhone.length < 10) {
           omitidos++;
           registrosRechazados.push({
@@ -89,7 +89,7 @@ export class ImportService {
           continue;
         }
 
-        // Val 3: Duplicados en la campaña (Constraint Unique)
+        // Duplicados en la campaña 
         const existingLead = await tx.campaignLeads.findUnique({
           where: {
             campaign_id_phone_number: {
@@ -108,7 +108,7 @@ export class ImportService {
           continue;
         }
 
-        // Si pasa todas las validaciones, se inserta normalmente
+        // Revisa validaciones...
         const additionalData = { ...row };
         delete additionalData[dto.colTelefono];
         delete additionalData[dto.colNombre];
@@ -134,8 +134,8 @@ export class ImportService {
       }
     });
 
-    // Generar el CSV de errores si es que existen rechazos
-    // TODO Error aca
+    // TODO Generar el CSV de errores si es que existen rechazos
+    
     const csvErroresBase64 = registrosRechazados.length > 0
       ? this.generateBase64Csv(registrosRechazados)
       : null;
@@ -154,7 +154,7 @@ export class ImportService {
     };
   }
 
-  // Función auxiliar para convertir el JSON de errores a un string CSV en Base64
+  // TODO Función auxiliar para convertir el JSON de errores a un string CSV en Base64
   private generateBase64Csv(data: any[]): string {
     const headers = Object.keys(data[0]);
     const csvRows = [headers.join(',')]; // Primera fila: Cabeceras
@@ -162,7 +162,7 @@ export class ImportService {
     for (const row of data) {
       const values = headers.map(header => {
         const val = row[header] ? row[header].toString() : '';
-        // Escapar comillas dobles si el texto contiene comas
+        
         return `"${val.replace(/"/g, '""')}"`;
       });
       csvRows.push(values.join(','));

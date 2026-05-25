@@ -17,11 +17,14 @@ export class ImportController {
       throw new BadRequestException('El archivo CSV es requerido.');
     }
     
-    // Validamos que sea efectivamente un CSV
+    // TODO Validar que sea un CSV
+    
     if (file.mimetype !== 'text/csv' && !file.originalname.endsWith('.csv')) {
       throw new BadRequestException('Formato de archivo inválido. Debe ser un CSV.');
     }
 
     return await this.importService.processCsv(file.buffer, uploadCsvDto);
   }
+
+  // TODO Registrar campana
 }
